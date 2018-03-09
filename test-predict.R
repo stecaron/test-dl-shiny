@@ -6,7 +6,8 @@ library(jpeg)
 library(raster)
 
 # Importer le model pre-trained
-model <- load_model_hdf5("python/model")
+# model <- load_model_hdf5("python/model")
+model <- application_resnet50(weights = 'imagenet')
 
 # Importer l'image
 image_test <- image_load(path = "python/figure-house.jpg", target_size = c(224, 224))
