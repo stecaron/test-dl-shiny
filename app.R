@@ -9,6 +9,15 @@ library(jpeg)
 library(raster)
 
 
+# Define variables --------------------------------------------------------
+
+# pretrained_nn <- c("ResNet50", "VGG16", "VGG19", "InceptionV3")
+pretrained_nn <- c("ResNet50", "VGG16")
+resnet50 <- load_model_hdf5("python/resnet50.h5")
+vgg16 <- load_model_hdf5("python/vgg16.h5")
+# vgg19 <- load_model_hdf5("python/vgg19.h5")
+# inceptionv3 <- load_model_hdf5("python/inceptionv3.h5")
+
 # Define user interface ---------------------------------------------------
 
 ui <- fluidPage(
@@ -21,12 +30,25 @@ ui <- fluidPage(
                 accept = c(
                   "image/jpg"
                   )
-      )
+      ),
+      selectInput(inputId = "model", label = "Choisir un réseau de neurones", choices = pretrained_nn, selected = pretrained_nn[1], multiple = FALSE, selectize = TRUE),
+      actionButton("predict", "Prédire")
     ),
     
     
     mainPanel(
-      uiOutput('images')
+      fluidRow(
+        h3("Image importée:"),
+        column(8, align="center",
+               uiOutput('images')
+        )
+      ),
+      hr(),
+      fluidRow(
+        column(8, align="center",
+               tableOutput("predictions")
+        )
+      )
     )
   )
 )
@@ -36,72 +58,55 @@ ui <- fluidPage(
 
 server <- function(input, output, session){
   
-  output$files <- renderTable(input$files)
-  
-  files <- reactive({
-    files <- input$file_image
-    files$datapath <- gsub("\\\\", "/", files$datapath)
-    files
+  model_selected <- reactive({
+    input$model
   })
   
+  # Create reactive neural net
+  model <- reactive({
+    if (model_selected() == "ResNet50"){
+      model <- resnet50
+    } else if (model_selected() == "VGG16"){
+      model <- vgg16
+    } else if (model_selected() == "VGG19"){
+      model <- vgg19
+    } else if (model_selected() == "InceptionV3"){
+      model <- inceptionv3
+    }
+    model
+  })
   
   output$images <- renderUI({
     if(is.null(input$file_image)) return(NULL)
-    # imagename = paste0("image", 1)
-    image_output_list <- imageOutput("image_importer")
-    #   lapply(1:nrow(files()),
-    #          function(i)
-    #          {
-    #            imagename = paste0("image", i)
-    #            imageOutput(imagename)
-    #          })
-    # 
-    # do.call(tagList, image_output_list)
+    imageOutput("image_importer")
   })
-  
-  # output$images <- renderUI({
-  #   if(is.null(input$file_image)) return(NULL)
-  #   image_output_list <- 
-  #     lapply(1:nrow(files()),
-  #            function(i)
-  #            {
-  #              imagename = paste0("image", i)
-  #              imageOutput(imagename)
-  #            })
-  #   
-  #   do.call(tagList, image_output_list)
-  # })
-  
-  # observe({
-  #   if(is.null(input$file_image)) return(NULL)
-  #   for (i in 1:nrow(files()))
-  #   {
-  #   local({
-  #   my_i <- i
-  #   imagename = paste0("image", my_i)
-  #       output[[imagename]] <- 
-  #         renderImage({
-  #           list(src = files()$datapath,
-  #                alt = "Image failed to render")
-  #         }, deleteFile = FALSE)
-  #     })
-  #   }
-  # })
   
   observe({
     if(is.null(input$file_image)) return(NULL)
-    # for (i in 1:nrow(files()))
-    # {
-    #   local({
-    #     my_i <- i
-        # imagename = paste0("image", 1)
         output[["image_importer"]] <- 
           renderImage({
-            list(src = files()$datapath,
+            list(src = input$file_image$datapath,
                  alt = "Image failed to render")
           }, deleteFile = FALSE)
-      # })
-    # }
+  })
+  
+  preds <- eventReactive(input$predict, {
+    if(is.null(input$file_image)) return(NULL)
+    
+    # # Preprocess the image
+    image_test <- image_load(path = input$file_image$datapath, target_size = c(224, 224))
+    image_test <- image_to_array(image_test)
+    image_test <- array_reshape(image_test, c(1, dim(image_test)))
+    image_test <- imagenet_preprocess_input(image_test)
+    
+    # # Predict the image
+    preds <- model() %>% predict(image_test)
+    preds_table <- imagenet_decode_predictions(preds, top = 3)[[1]]
+    preds_table
+  })
+  
+  output$predictions <- renderTable({
+    preds()
   })
   
 }
