@@ -7,7 +7,8 @@ library(keras)
 library(reticulate)
 library(jpeg)
 library(raster)
-
+library(data.table)
+library(DT)
 
 # Define variables --------------------------------------------------------
 
@@ -46,7 +47,7 @@ ui <- fluidPage(
       hr(),
       fluidRow(
         column(8, align="center",
-               tableOutput("predictions")
+               dataTableOutput("predictions")
         )
       )
     )
@@ -101,12 +102,13 @@ server <- function(input, output, session){
     
     # # Predict the image
     preds <- model() %>% predict(image_test)
-    preds_table <- imagenet_decode_predictions(preds, top = 3)[[1]]
-    preds_table
+    preds_table <- data.table(imagenet_decode_predictions(preds, top = 3)[[1]])
+    preds_table[, class_name := NULL]
+    preds_table[, score := round(score, 2)]
   })
   
-  output$predictions <- renderTable({
-    preds()
+  output$predictions <- renderDataTable({
+    datatable(preds(), options = list(searching = FALSE, paging = FALSE))
   })
   
 }

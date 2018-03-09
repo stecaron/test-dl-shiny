@@ -27,4 +27,4 @@ image_test <- imagenet_preprocess_input(image_test)
 preds <- model %>% predict(image_test)
 preds_table <- imagenet_decode_predictions(preds, top = 3)[[1]]
 
-class(preds_table)
+data.table(preds_table)[, (c("class_description", "score")), with =  FALSE]
